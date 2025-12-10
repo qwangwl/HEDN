@@ -1,0 +1,9 @@
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.ipynb
+img/
+logs*/
+*.pdf

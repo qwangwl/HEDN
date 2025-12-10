@@ -1,0 +1,51 @@
+# config.yaml
+
+# General settings
+seed: 42
+num_workers: 0
+
+# Training parameters
+batch_size: 96
+max_iter: 1000
+early_stop: 0
+log_interval: 500
+
+# Transfer learning parameters
+transfer_loss_type: dann
+
+# Data-related parameters
+dataset_name: seed3
+num_classes: 3
+num_subjects: 15
+feature_dim: 310
+
+# Dataset specific paths (SEED and SEED-IV Feature datasets)
+session: 1
+seed3_path: "E:\\EEG_DataSets\\SEED\\ExtractedFeatures\\"
+seed4_path: "E:\\EEG_DataSets\\SEED_IV\\eeg_feature_smooth\\"
+deap_path: "E:\\EEG_DataSets\\DEAP\\"
+
+# Model saving
+saved_model: False
+# tmp_saved_path will be generated dynamically based on the current date,
+# so it's not typically set in the config file unless you want to override it.
+tmp_saved_path: "logs\\" # Example if you want to hardcode for a specific date
+
+# For HEDN DBSCAN
+eps: 1.0
+min_samples: 5
+
+# HEDN related
+# transfer_loss_weight is defined as 1 because \lambda_1 is already implemented in adv
+transfer_loss_weight: 1.0
+constraint_loss_weight: 0.01
+src_momentum: 0.5
+tgt_momentum: 0.1
+
+# Optimizer parameters
+lr: 1e-3
+weight_decay: 1e-5
+
+# Ablation study configurations
+ablation: main
+num_sources: 14
