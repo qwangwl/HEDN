@@ -34,8 +34,8 @@ def cross_subject(args):
     all_subjects = np.unique(groups[:, 0])
 
     for subject in range(1, args.num_subjects + 1):
-        # if  subject >= 2:
-        #     break
+        if  subject >= 2:
+            break
         print(f"开始适应受试者 {subject}")
         # 每一个受试者都重新定义种子。
         setup_seed(args.seed)
@@ -119,7 +119,6 @@ if __name__ == "__main__":
         setattr(args, "batch_size", 96)
     tmp_saved_path = os.path.join(args.tmp_saved_path, 
                                   f"{args.dataset_name}",
-                                  args.ablation,
                                   f"{args.session}_{args.emotion}")
     setattr(args, "tmp_saved_path", tmp_saved_path)
     setattr(args, "device", torch.device('cuda' if torch.cuda.is_available() else 'cpu'))

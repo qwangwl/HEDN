@@ -389,12 +389,12 @@ class AblationHEDN(HEDN):
         src_labels = src_labels.permute(1, 0, 2)
         src_clusters = src_clusters.permute(1, 0)
 
-        if self.ablation == "abl_random":
+        if self.ablation == "abl_sra_random":
             hard_idx, easy_idx = self.source_assessment_by_random()
-        elif "abl_src_w_hard" == self.ablation:
+        elif "abl_sra_w_hard" == self.ablation:
             hard_idx, easy_idx = self.source_assessment(srcs, src_labels, tgt)
             easy_idx = hard_idx  
-        elif "abl_src_w_easy" == self.ablation:
+        elif "abl_sra_w_easy" == self.ablation:
             hard_idx, easy_idx = self.source_assessment(srcs, src_labels, tgt)
             hard_idx = easy_idx
         else:
@@ -409,7 +409,7 @@ class AblationHEDN(HEDN):
         if self.use_hard:
             loss_cls , loss_adv = self.hard_forward(hard_feat, tgt_feat, hard_label)
         if self.use_easy:
-            loss_cls , loss_adv = self.easy_forward(easy_feat, tgt_feat, easy_cluster)
+            src_clu_loss , tgt_clu_loss = self.easy_forward(easy_feat, tgt_feat, easy_cluster, tgt_cluster)
             if self.use_sim:
                 tgt_proto_pred = self.easy_network(
                     easy_feat.detach(),

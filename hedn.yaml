@@ -7,7 +7,7 @@ num_workers: 0
 # Training parameters
 batch_size: 96
 max_iter: 1000
-early_stop: 0
+early_stop: 1000
 log_interval: 500
 
 # Transfer learning parameters

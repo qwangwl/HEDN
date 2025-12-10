@@ -15,7 +15,7 @@ for seed in [40, 41, 42, 43, 44]:
             f"--dataset_name {dataset_name} "
             f"--session {sess} "
             f"--seed {seed} "
-            f"--tmp_saved_path logs_r/{seed} "
+            f"--tmp_saved_path logs/random/{seed} "
         )
         os.system(command)
 
@@ -27,25 +27,6 @@ for seed in [40, 41, 42, 43, 44]:
             f"--dataset_name {dataset_name} "
             f"--session {sess} "
             f"--seed {seed} "
-            f"--tmp_saved_path logs_r/{seed} "
+            f"--tmp_saved_path logs/random/{seed} "
         )
         os.system(command)
-
-# ablations = [
-#     "main",
-#     "abl_tda_random",
-#     "abl_tda_wo_easy",
-#     "abl_tda_wo_hard",
-#     "abl_tda_only_adv",
-#     "abl_tda_src_adv",
-#     "abl_comp_wo_easy",
-#     "abl_comp_wo_hard",
-#     "abl_comp_wo_clusterloss",
-# ]
-
-# for ablation in ablations:
-#     command = (
-#         f"python cross_dataset.py "
-#         f"--ablation {ablation} "
-#     )
-#     os.system(command)

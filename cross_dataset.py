@@ -128,8 +128,7 @@ if __name__ == "__main__":
                                     "cross_dataset",
                                     f"{source_dataset}_to_{target_dataset}",
                                     "sin_subject_wise", # 占位
-                                    # f"{args.seed}",
-                                    args.ablation)
+                                    )
         setattr(args, "tmp_saved_path", tmp_saved_path)
         
         cross_dataset(args, source_dataset=source_dataset, target_dataset=target_dataset)

@@ -68,13 +68,7 @@ def get_model_utils_for_ablation(args):
     }
     print(args.ablation)
     model = AblationHEDN(**params).cuda()
-    # if "abl_comp_wo_easy" == args.ablation:
-    #     model = HARD(**params).cuda()
-    # elif "abl_comp_wo_hard" == args.ablation:
-    #     model = EASY(**params).cuda()
-    # else:
-    #     model = HEDN(**params).cuda()
-
+    
     # Optimizer
     params = model.get_step1_parameters()
     optimizer = torch.optim.RMSprop(params, lr=args.lr, weight_decay=args.weight_decay)

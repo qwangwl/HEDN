@@ -199,7 +199,7 @@ class AblationHEDNTrainer(HEDNTrainer):
         )
         self.ablation = ablation
         if "abl_comp_wo_hard" == self.ablation:
-            params = list(self.model.feature_extractor.get_parameters()) + list(self.model.proto_classifier.get_parameters())
+            params = list(self.model.feature_extractor.get_parameters()) + list(self.model.get_step2_parameters())
             self.fe_opt = torch.optim.Adam(params, lr=1e-3)
 
     def train(self, source_loaders, target_loader):
