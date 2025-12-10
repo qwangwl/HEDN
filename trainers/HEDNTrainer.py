@@ -106,7 +106,9 @@ class HEDNTrainer(object):
             iter_losses = {
                 'cls_loss': cls_loss.detach().item() if isinstance(cls_loss, torch.Tensor) else cls_loss,
                 'transfer_loss': transfer_loss.detach().item() if isinstance(transfer_loss, torch.Tensor) else transfer_loss,
-                'cons_loss': cons_loss.detach().item() if isinstance(cons_loss, torch.Tensor) else cons_loss
+                'cons_loss': cons_loss.detach().item() if isinstance(cons_loss, torch.Tensor) else cons_loss,
+                "src_clu_loss": src_clu_loss.detach().item() if isinstance(src_clu_loss, torch.Tensor) else src_clu_loss,
+                "tgt_clu_loss": tgt_clu_loss.detach().item() if isinstance(tgt_clu_loss, torch.Tensor) else tgt_clu_loss,
             }
 
             log_entry = [v for _, v in iter_losses.items()] + [source_acc, target_acc, best_acc, int(easy_idx.cpu().numpy()) + 1, int(hard_idx.cpu().numpy()) + 1]
@@ -170,7 +172,7 @@ class HEDNTrainer(object):
         return info
 
 
-class HEDNTrainer_Ablation_Comp(HEDNTrainer):
+class HEDNTrainer_Ablation(HEDNTrainer):
     # The Pytorch implementation of Hard-Easy Dual Network (HEDN) Trainer
     def __init__(self, 
                  model, 
@@ -185,7 +187,7 @@ class HEDNTrainer_Ablation_Comp(HEDNTrainer):
                  ablation: str = "main",
                  **kwargs):
 
-        super(HEDNTrainer_Ablation_Comp, self).__init__(
+        super(HEDNTrainer_Ablation, self).__init__(
             model=model,
             optimizer=optimizer,
             lr_scheduler=lr_scheduler,
@@ -278,6 +280,20 @@ class HEDNTrainer_Ablation_Comp(HEDNTrainer):
                 loss2.backward()
                 self.fe_opt.step()
 
+            else:
+                cls_loss, transfer_loss, cons_loss, src_clu_loss, tgt_clu_loss, easy_idx, hard_idx  = self.model(src_data, tgt_data, src_label, src_cluster, tgt_cluster)
+                loss = cls_loss + self.transfer_loss_weight * transfer_loss + self.constraint_loss_weight * cons_loss
+                self.optimizer.zero_grad()
+                loss.backward(retain_graph=True)
+                self.optimizer.step()
+
+                # Phase 2: Update Prototype Feature Extractor
+                cls_loss, transfer_loss, cons_loss, src_clu_loss, tgt_clu_loss, easy_idx, hard_idx = self.model(src_data, tgt_data, src_label, src_cluster, tgt_cluster)
+                self.fe_opt.zero_grad()
+                loss2 = src_clu_loss + tgt_clu_loss
+                loss2.backward()
+                self.fe_opt.step()
+
             source_acc = self.test(source_loaders, mode="source")
             target_acc = self.test(target_loader, mode="target")
 
@@ -286,7 +302,9 @@ class HEDNTrainer_Ablation_Comp(HEDNTrainer):
             iter_losses = {
                 'cls_loss': cls_loss.detach().item() if isinstance(cls_loss, torch.Tensor) else cls_loss,
                 'transfer_loss': transfer_loss.detach().item() if isinstance(transfer_loss, torch.Tensor) else transfer_loss,
-                'cons_loss': cons_loss.detach().item() if isinstance(cons_loss, torch.Tensor) else cons_loss
+                'cons_loss': cons_loss.detach().item() if isinstance(cons_loss, torch.Tensor) else cons_loss,
+                "src_clu_loss": src_clu_loss.detach().item() if isinstance(src_clu_loss, torch.Tensor) else src_clu_loss,
+                "tgt_clu_loss": tgt_clu_loss.detach().item() if isinstance(tgt_clu_loss, torch.Tensor) else tgt_clu_loss,
             }
 
             log_entry = [v for _, v in iter_losses.items()] + [source_acc, target_acc, best_acc]

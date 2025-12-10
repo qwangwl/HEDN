@@ -1,19 +1,16 @@
 
 import torch
 from models import HEDN, EASY, HARD
-from trainers import HEDNTrainer, HEDNTrainer_Ablation_Comp
+from trainers import HEDNTrainer, HEDNTrainer_Ablation
 
 def get_model_utils(args):
     """
     Get model, optimizer, scheduler, and trainer.
     """
     # Model parameters
-    base_params = {
+    params = {
         "input_dim": args.feature_dim,
         "num_classes": args.num_classes,
-    }
-    # print(args.num_of_s_clusters, args.num_of_t_clusters)
-    pm_params = {
         "transfer_loss_type": args.transfer_loss_type,
         "max_iter": args.max_iter,
         "num_src_clusters": args.num_src_clusters,
@@ -23,8 +20,7 @@ def get_model_utils(args):
         "tgt_momentum": args.tgt_momentum,
     }
 
-    combined_params = {**base_params, **pm_params}
-    model = HEDN(**combined_params).cuda()
+    model = HEDN(**params).cuda()
 
     # Optimizer
     params = model.get_parameters()
@@ -57,13 +53,10 @@ def get_model_utils_for_ablation(args):
     """
     Get model, optimizer, scheduler, and trainer.
     """
-    # Model parameters
-    base_params = {
+
+    params = {
         "input_dim": args.feature_dim,
         "num_classes": args.num_classes,
-    }
-    # print(args.num_of_s_clusters, args.num_of_t_clusters)
-    pm_params = {
         "transfer_loss_type": args.transfer_loss_type,
         "max_iter": args.max_iter,
         "num_src_clusters": args.num_src_clusters,
@@ -74,13 +67,12 @@ def get_model_utils_for_ablation(args):
         "ablation": args.ablation,
     }
     print(args.ablation)
-    combined_params = {**base_params, **pm_params}
     if "abl_comp_wo_easy" == args.ablation:
-        model = HARD(**combined_params).cuda()
+        model = HARD(**params).cuda()
     elif "abl_comp_wo_hard" == args.ablation:
-        model = EASY(**combined_params).cuda()
+        model = EASY(**params).cuda()
     else:
-        model = HEDN(**combined_params).cuda()
+        model = HEDN(**params).cuda()
 
     # Optimizer
     params = model.get_parameters()
@@ -101,19 +93,10 @@ def get_model_utils_for_ablation(args):
         "early_stop": args.early_stop,
         "log_interval": args.log_interval,
     }
-    if "comp" in args.ablation:
-        # w/o HEDN
-        # print(args.ablation)
-        trainer = HEDNTrainer_Ablation_Comp(
-            model, 
-            optimizer, 
-            ablation=args.ablation,
-            **trainer_params
-        )
-    else:
-        trainer = HEDNTrainer(
-            model, 
-            optimizer, 
-            **trainer_params
-        )
+    trainer = HEDNTrainer_Ablation(
+        model, 
+        optimizer, 
+        ablation=args.ablation,
+        **trainer_params
+    )
     return trainer
