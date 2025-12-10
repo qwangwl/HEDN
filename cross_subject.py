@@ -76,14 +76,13 @@ def cross_subject(args):
         trainer.model.load_state(trainer.get_best_model_state())
         # print(trainer.model.classifier.P[:100])
         val_start = time.time()
-        best_test_acc, best_f1_score = evaluate(trainer.model, val_loader, args.device)
+        best_val_acc, best_f1_score = evaluate(trainer.model, val_loader, args.device)
         val_time = (time.time() - val_start) * 1000
 
         results.append({
             "subject": subject,
             "best_val_acc": best_val_acc,
             "last_val_acc": last_val_acc,
-            "best_test_acc": best_test_acc,
             "best_f1_score": best_f1_score,
             "last_f1_score": last_f1_score,
             "train_time(s)": train_time,
@@ -93,7 +92,6 @@ def cross_subject(args):
         save_subject_results(args, subject, trainer, np_log)
         print(f"\n受试者 {subject} 完成:")
         print(f"  - 最佳验证准确率: {best_val_acc:.4f}")
-        print(f"  - 最佳测试准确率: {best_test_acc:.4f}")
         print(f"  - 训练时间: {train_time:.2f}s")
         print(f"  - 验证时间: {val_time:.2f}ms")
 

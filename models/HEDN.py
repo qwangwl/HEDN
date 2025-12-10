@@ -26,17 +26,17 @@ class FeatureExtractor(nn.Module):
         ]
         return params
     
-class LabelClassifier(nn.Module):
+class HardClassifier(nn.Module):
     def __init__(self, 
                  input_dim: int = 64,
                  hidden_dim: int = 32,
-                 num_of_class: int = 3,
+                 num_classes: int = 3,
                  ):
-        super(LabelClassifier, self).__init__()
+        super(HardClassifier, self).__init__()
 
         self.fc1 = nn.Linear(input_dim, hidden_dim)
         self.fc2 = nn.Linear(hidden_dim, input_dim)
-        self.fc3 = nn.Linear(input_dim, num_of_class)
+        self.fc3 = nn.Linear(input_dim, num_classes)
 
     def forward(self, feature):
         f1 = self.fc1(feature)
@@ -59,7 +59,7 @@ class LabelClassifier(nn.Module):
         return params
     
 
-class ProtoClassifier(nn.Module):
+class EasyNetwork(nn.Module):
     def __init__(self, 
                  input_dim=64, 
                  num_classes=3, 
@@ -201,9 +201,9 @@ class HEDN(nn.Module):
         self.num_sources = num_sources
         
         self.feature_extractor = FeatureExtractor(input_dim=input_dim)
-        self.classifier = LabelClassifier(input_dim=64, num_of_class=num_classes)
-
-        self.proto_classifier = ProtoClassifier(
+        self.hard_classifier = HardClassifier(input_dim=64, num_classes=num_classes)
+        
+        self.easy_network = EasyNetwork(
             input_dim=64, 
             src_momentum=src_momentum,
             tgt_momentum=tgt_momentum,
@@ -213,11 +213,12 @@ class HEDN(nn.Module):
             num_tgt_clusters=num_tgt_clusters,
         )
 
-        self.ce_loss = nn.CrossEntropyLoss()
-        self.sim_loss = nn.CrossEntropyLoss()
+        self.cls_loss = nn.CrossEntropyLoss()
+        # cross-network consistency loss
+        self.consis_loss = nn.CrossEntropyLoss()
         self.clu_loss = SupConLoss(temperature = 1)
 
-        self.adv_criterion = TransferLoss(
+        self.hard_advcriterion = TransferLoss(
             loss_type=transfer_loss_type,
             max_iter=max_iter,
             num_class=num_classes,
@@ -225,8 +226,24 @@ class HEDN(nn.Module):
         )
 
         self.ablation = ablation
+    def hard_forward(self, src_feat, tgt_feat, src_label):
 
-        self.count = 0
+        src_logit = self.hard_classifier(src_feat)
+        loss_cls = self.cls_loss(src_logit, src_label)
+        loss_adv = self.hard_advcriterion(src_feat, tgt_feat)
+        return loss_cls , loss_adv
+
+    def easy_forward(self, src_feat_easy, tgt_feat, src_cluster_easy, tgt_cluster):
+        src_clu_loss = self.clu_loss(
+            self.easy_network.extractor(src_feat_easy),
+            src_cluster_easy.squeeze(0)
+        )
+        tgt_clu_loss = self.clu_loss(
+            self.easy_network.extractor(tgt_feat),
+            tgt_cluster.squeeze(0)
+        )
+        return src_clu_loss, tgt_clu_loss
+
     def forward(self, srcs, tgt, src_labels, src_clusters, tgt_cluster):
         # [B, N, F] - > [N, B, F]
         # B: batch_size(批量大小)
@@ -237,58 +254,31 @@ class HEDN(nn.Module):
         src_labels = src_labels.permute(1, 0, 2)
         src_clusters = src_clusters.permute(1, 0)
 
-        if "abl_tda_random" == self.ablation:
-            hard_idx, easy_idx = self.task_assess_by_random()
-        elif "abl_tda_wo_easy" == self.ablation:
-            hard_idx, easy_idx = self.task_assess_by_tda(srcs, src_labels, tgt, w_src=1.0)
-            easy_idx = hard_idx
-        elif "abl_tda_wo_hard" == self.ablation:
-            hard_idx, easy_idx = self.task_assess_by_tda(srcs, src_labels, tgt, w_src=1.0)
-            hard_idx = easy_idx
-        elif "abl_tda_only_adv" == self.ablation:
-            hard_idx, easy_idx = self.task_assess_by_tda(srcs, src_labels, tgt, w_src=0.0)
-        elif "abl_tda_src_adv" == self.ablation:
-            hard_idx, easy_idx = self.task_assess_by_tda(srcs, src_labels, tgt, w_src=0.5)
-        else:
-            hard_idx, easy_idx = self.task_assess_by_tda(srcs, src_labels, tgt, w_src=1.0)
+        # TODO SRA
+        hard_idx, easy_idx = self.source_assessment(srcs, src_labels, tgt)
 
-        # TODO Use Hardest Task to Update Classifier
-        src_feat_hard = self.feature_extractor(srcs[hard_idx])
-        src_logit_hard = self.classifier(src_feat_hard)
-        loss_cls = self.ce_loss(src_logit_hard, src_labels[hard_idx])
-
-        # TODO Use Hardest Task to Update Discriminator
+        # TODO shared feature extractor
         tgt_feat = self.feature_extractor(tgt)
-        loss_adv = self.adv_criterion(src_feat_hard, tgt_feat)
+        easy_feat, easy_cluster = self.feature_extractor(srcs[easy_idx]), src_clusters[easy_idx]
+        hard_feat, hard_label = self.feature_extractor(srcs[hard_idx]), src_labels[hard_idx]
+
+        loss_cls , loss_adv = self.hard_forward(hard_feat, tgt_feat, hard_label)
+
+        # TODO easy loss
+        src_clu_loss, tgt_clu_loss = self.easy_forward(easy_feat, tgt_feat, easy_cluster, tgt_cluster)
 
         # Network Only Hard
-        # TODO Use Easiest Task to Update Proto Classifier
-        # Easiest Task Dont Update FeatureExtractor
-        src_feat_easy = self.feature_extractor(srcs[easy_idx])
-        src_cluster_easy = src_clusters[easy_idx]
-
-        tgt_proto_pred = self.proto_classifier(
-            src_feat_easy.detach(),
-            src_cluster_easy, 
+        tgt_proto_pred = self.easy_network(
+            easy_feat.detach(),
+            easy_cluster, 
             easy_idx, 
             tgt_feat.detach(),
             tgt_cluster
         )
+        tgt_logit = self.hard_classifier(tgt_feat)
+        loss_consis = self.consis_loss(tgt_logit, tgt_proto_pred.to(tgt_logit.device))
+        return loss_cls , loss_adv, loss_consis, src_clu_loss, tgt_clu_loss, easy_idx, hard_idx
 
-        src_clu_loss = self.clu_loss(
-            self.proto_classifier.extractor(src_feat_easy),
-            src_clusters[easy_idx].squeeze(0),
-        )
-
-        tgt_clu_loss = self.clu_loss(
-            self.proto_classifier.extractor(tgt_feat), 
-            tgt_cluster.squeeze(0), 
-        )
-        
-        tgt_logit = self.classifier(tgt_feat)
-        loss_sim = self.sim_loss(tgt_logit, tgt_proto_pred.to(tgt_logit.device))
-        return loss_cls , loss_adv, loss_sim, src_clu_loss, tgt_clu_loss, easy_idx, hard_idx
-    
     def predict(self, data, mode="target"):
         if mode == "source":
             return self.predict_by_hard(data)
@@ -299,78 +289,148 @@ class HEDN(nn.Module):
         self.eval()
         with torch.no_grad():
             feat = self.feature_extractor(data)
-            pred = self.proto_classifier.predict(feat)
+            pred = self.easy_network.predict(feat)
         return pred
     
     def predict_by_hard(self, data):
         self.eval()
         with torch.no_grad():
             feat = self.feature_extractor(data)
-            pred = self.classifier.predict(feat)
+            pred = self.hard_classifier.predict(feat)
         return pred
     
-    def get_parameters(self):
-        params = [
-            *self.feature_extractor.get_parameters(),
-            *self.classifier.get_parameters(),
-        ]
-        params.append(
-            {"params": self.adv_criterion.loss_func.domain_classifier.parameters(), "lr_mult":1}
-        )
-        return params
-
-    def on_training_start(self, srcs, src_clusters, src_labels):
-        with torch.no_grad():
-            feats = [self.feature_extractor(src).cpu() for src in srcs]
-        self.proto_classifier.initialize_cluster_labels(src_labels, src_clusters)
-        self.proto_classifier.initialize_cluster_centers(feats, src_clusters)
-
     @torch.no_grad()
-    def task_assess_by_tda(self, srcs, src_labels, tgt, w_src=0.5):
-        src_all = srcs.reshape(-1, srcs.size(-1))
-        src_lbl_all = src_labels.reshape(-1, src_labels.size(-1))
-        src_feat_all = self.feature_extractor(src_all)
-        src_logits_all = self.classifier(src_feat_all)
-        src_loss_all = F.cross_entropy(src_logits_all, src_lbl_all, reduction='none')
-        src_loss_chunks = src_loss_all.view(self.num_sources, -1)
-        src_chunk_loss = src_loss_chunks.mean(dim=-1)
+    def source_assessment(self, srcs, src_labels, tgt):
+        num_sources = srcs.size(0)
+        scores = torch.zeros(num_sources, device=srcs.device)
 
         tgt_feat = self.feature_extractor(tgt)
-        adv_losses = torch.zeros(self.num_sources, device=tgt.device)
-        for i in range(self.num_sources):
-            src_feat_i = self.feature_extractor(srcs[i])
-            adv_losses[i] = self.adv_criterion(src_feat_i, tgt_feat).detach()
+        for i in range(num_sources):
+            src_feat = self.feature_extractor(srcs[i])
+            # Compute only the hard branch losses (no similarity loss)
+            loss_cls, _ = self.hard_forward(src_feat, tgt_feat, src_labels[i])
 
-        w_adv = 1 - w_src
-        balance = w_src * src_chunk_loss + w_adv * torch.abs(adv_losses - 0.693)
+            # Criterion: hard source = smaller loss
+            scores[i] = -loss_cls
 
-        hard_idx = torch.argmax(balance)
-        easy_idx = torch.argmin(balance)
+        hard_idx = torch.argmin(scores)
+        easy_idx = torch.argmax(scores)
 
         return hard_idx, easy_idx
 
     @torch.no_grad
-    def task_assess_by_random(self):
+    def source_assessment_by_random(self):
         hard_idx, easy_idx = torch.randint(0, self.num_sources, (2,))
         return hard_idx, easy_idx
     
+    
+    def get_step1_parameters(self):
+        params = [
+            *self.feature_extractor.get_parameters(),
+            *self.hard_classifier.get_parameters(),
+        ]
+        params.append(
+            {"params": self.hard_advcriterion.loss_func.domain_classifier.parameters(), "lr_mult":1}
+        )
+        return params
+
+    def get_step2_parameters(self):
+        params = [
+            *self.easy_network.get_parameters(),
+        ]
+        return params
+
+    @torch.no_grad()
+    def on_training_start(self, srcs, src_clusters, src_labels):
+        feats = [self.feature_extractor(src).cpu() for src in srcs]
+        self.easy_network.initialize_cluster_labels(src_labels, src_clusters)
+        self.easy_network.initialize_cluster_centers(feats, src_clusters)
+
+
     def get_state(self):
         return {
             "model": self.state_dict(),
             "proto":{
-                "src_cluster_labels": self.proto_classifier.src_cluster_labels.clone().detach(),
-                "src_cluster_centers": self.proto_classifier.src_cluster_centers.clone().detach(),
-                "tgt_cluster_centers": self.proto_classifier.tgt_cluster_centers.clone().detach(),
+                "src_cluster_labels": self.easy_network.src_cluster_labels.clone().detach(),
+                "src_cluster_centers": self.easy_network.src_cluster_centers.clone().detach(),
+                "tgt_cluster_centers": self.easy_network.tgt_cluster_centers.clone().detach(),
             }
         }
     
     def load_state(self, state):
         self.load_state_dict(state["model"])
-        self.proto_classifier.src_cluster_labels = state["proto"]["src_cluster_labels"]
-        self.proto_classifier.src_cluster_centers = state["proto"]["src_cluster_centers"]
-        self.proto_classifier.tgt_cluster_centers = state["proto"]["tgt_cluster_centers"]
+        self.easy_network.src_cluster_labels = state["proto"]["src_cluster_labels"]
+        self.easy_network.src_cluster_centers = state["proto"]["src_cluster_centers"]
+        self.easy_network.tgt_cluster_centers = state["proto"]["tgt_cluster_centers"]
 
 
+class AblationHEDN(HEDN):
+    def __init__(self, 
+                 ablation: str = "main",
+                 **hedn_kwargs):
+        super(AblationHEDN, self).__init__(**hedn_kwargs)
+
+        self.ablation = ablation
+        self.use_hard = True
+        self.use_easy = True
+        self.use_sim = True
+
+        if self.ablation == "abl_comp_wo_easy":
+            # 只训练 hard 分支（HARD 模式）
+            self.use_easy = False
+            self.use_sim = False
+        elif self.ablation == "abl_comp_wo_hard":
+            # 只训练 easy 分支（EASY 模式）
+            self.use_hard = False
+            self.use_sim = False
+
+    def forward(self, srcs, tgt, src_labels, src_clusters, tgt_cluster):
+        srcs = srcs.permute(1, 0, 2) 
+        src_labels = src_labels.permute(1, 0, 2)
+        src_clusters = src_clusters.permute(1, 0)
+
+        if self.ablation == "abl_random":
+            hard_idx, easy_idx = self.source_assessment_by_random()
+        elif "abl_src_w_hard" == self.ablation:
+            hard_idx, easy_idx = self.source_assessment(srcs, src_labels, tgt)
+            easy_idx = hard_idx  
+        elif "abl_src_w_easy" == self.ablation:
+            hard_idx, easy_idx = self.source_assessment(srcs, src_labels, tgt)
+            hard_idx = easy_idx
+        else:
+            hard_idx, easy_idx = self.source_assessment(srcs, src_labels, tgt)
+
+        tgt_feat = self.feature_extractor(tgt)
+        easy_feat, easy_cluster = self.feature_extractor(srcs[easy_idx]), src_clusters[easy_idx]
+        hard_feat, hard_label = self.feature_extractor(srcs[hard_idx]), src_labels[hard_idx]
+
+        loss_cls, loss_adv, src_clu_loss, tgt_clu_loss, loss_consis = 0, 0, 0, 0, 0
+
+        if self.use_hard:
+            loss_cls , loss_adv = self.hard_forward(hard_feat, tgt_feat, hard_label)
+        if self.use_easy:
+            loss_cls , loss_adv = self.easy_forward(easy_feat, tgt_feat, easy_cluster)
+            if self.use_sim:
+                tgt_proto_pred = self.easy_network(
+                    easy_feat.detach(),
+                    easy_cluster, 
+                    easy_idx, 
+                    tgt_feat.detach(),
+                    tgt_cluster
+                )
+                tgt_logit = self.hard_classifier(tgt_feat)
+                loss_consis = self.consis_loss(tgt_logit, tgt_proto_pred.to(tgt_logit.device))
+        
+        return loss_cls, loss_adv, loss_consis, src_clu_loss, tgt_clu_loss, easy_idx, hard_idx
+    
+    def predict(self, data, mode="target"):
+        if mode == "source":
+            return self.predict_by_hard(data)
+        elif mode == "target":
+            if self.ablation == "abl_comp_wo_easy":
+                return self.predict_by_hard(data)
+            return self.predict_by_easy(data)
+        
 class HARD(HEDN):
     def __init__(self, 
                  input_dim=310, 
@@ -407,15 +467,15 @@ class HARD(HEDN):
 
         # Task Difficulty Assessment By Source Classifier Loss
         # hard_idx, easy_idx = self.task_assess_by_src_loss(srcs, src_labels)
-        hard_idx, easy_idx = self.task_assess_by_tda(srcs, src_labels, tgt, w_src=1.0)
+        hard_idx, easy_idx = self.source_assessment(srcs, src_labels, tgt)
         # TODO Use Hardest Task to Update Classifier
         src_feat_hard = self.feature_extractor(srcs[hard_idx])
-        src_logit_hard = self.classifier(src_feat_hard)
-        loss_cls = self.ce_loss(src_logit_hard, src_labels[hard_idx])
+        src_logit_hard = self.hard_classifier(src_feat_hard)
+        loss_cls = self.cls_loss(src_logit_hard, src_labels[hard_idx])
 
         # TODO Use Hardest Task to Update Discriminator
         tgt_feat = self.feature_extractor(tgt)
-        loss_adv = self.adv_criterion(src_feat_hard, tgt_feat)
+        loss_adv = self.hard_advcriterion(src_feat_hard, tgt_feat)
 
         return loss_cls , loss_adv, 0, 0, 0
     
@@ -423,7 +483,7 @@ class HARD(HEDN):
         self.eval()
         with torch.no_grad():
             src_feat = self.feature_extractor(data)
-            src_pred = self.classifier.predict(src_feat)
+            src_pred = self.hard_classifier.predict(src_feat)
         return src_pred
     
 class EASY(HEDN):
@@ -460,7 +520,7 @@ class EASY(HEDN):
         src_labels = src_labels.permute(1, 0, 2)
         src_clusters = src_clusters.permute(1, 0)
 
-        hard_idx, easy_idx = self.task_assess_by_tda(srcs, src_labels, tgt, w_src=1.0)
+        hard_idx, easy_idx = self.source_assessment(srcs, src_labels, tgt)
 
         tgt_feat = self.feature_extractor(tgt)
  
@@ -470,7 +530,7 @@ class EASY(HEDN):
         src_feat_easy = self.feature_extractor(srcs[easy_idx])
         src_cluster_easy = src_clusters[easy_idx]
 
-        tgt_proto_pred = self.proto_classifier(
+        tgt_proto_pred = self.easy_network(
             src_feat_easy.detach(),
             src_cluster_easy, 
             easy_idx, 
@@ -479,12 +539,12 @@ class EASY(HEDN):
         )
 
         src_clu_loss = self.clu_loss(
-            self.proto_classifier.extractor(src_feat_easy),
+            self.easy_network.extractor(src_feat_easy),
             src_clusters[easy_idx].squeeze(0),
         )
 
         tgt_clu_loss = self.clu_loss(
-            self.proto_classifier.extractor(tgt_feat), 
+            self.easy_network.extractor(tgt_feat), 
             tgt_cluster.squeeze(0), 
         )
         
@@ -496,12 +556,12 @@ class EASY(HEDN):
             self.eval()
             with torch.no_grad():
                 src_feat = self.feature_extractor(data)
-                src_pred = self.classifier.predict(src_feat)
+                src_pred = self.hard_classifier.predict(src_feat)
             return src_pred
         
         elif mode == "target":
             self.eval()
             with torch.no_grad():
                 tgt_feat = self.feature_extractor(data)
-                tgt_proto_pred = self.proto_classifier.predict(tgt_feat)
+                tgt_proto_pred = self.easy_network.predict(tgt_feat)
             return tgt_proto_pred

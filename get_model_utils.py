@@ -1,7 +1,7 @@
 
 import torch
-from models import HEDN, EASY, HARD
-from trainers import HEDNTrainer, HEDNTrainer_Ablation
+from models import HEDN, AblationHEDN
+from trainers import HEDNTrainer, AblationHEDNTrainer
 
 def get_model_utils(args):
     """
@@ -23,7 +23,7 @@ def get_model_utils(args):
     model = HEDN(**params).cuda()
 
     # Optimizer
-    params = model.get_parameters()
+    params = model.get_step1_parameters()
     optimizer = torch.optim.RMSprop(params, lr=args.lr, weight_decay=args.weight_decay)
 
     # Learning rate scheduler default False
@@ -67,15 +67,16 @@ def get_model_utils_for_ablation(args):
         "ablation": args.ablation,
     }
     print(args.ablation)
-    if "abl_comp_wo_easy" == args.ablation:
-        model = HARD(**params).cuda()
-    elif "abl_comp_wo_hard" == args.ablation:
-        model = EASY(**params).cuda()
-    else:
-        model = HEDN(**params).cuda()
+    model = AblationHEDN(**params).cuda()
+    # if "abl_comp_wo_easy" == args.ablation:
+    #     model = HARD(**params).cuda()
+    # elif "abl_comp_wo_hard" == args.ablation:
+    #     model = EASY(**params).cuda()
+    # else:
+    #     model = HEDN(**params).cuda()
 
     # Optimizer
-    params = model.get_parameters()
+    params = model.get_step1_parameters()
     optimizer = torch.optim.RMSprop(params, lr=args.lr, weight_decay=args.weight_decay)
 
     # Learning rate scheduler
@@ -93,7 +94,7 @@ def get_model_utils_for_ablation(args):
         "early_stop": args.early_stop,
         "log_interval": args.log_interval,
     }
-    trainer = HEDNTrainer_Ablation(
+    trainer = AblationHEDNTrainer(
         model, 
         optimizer, 
         ablation=args.ablation,

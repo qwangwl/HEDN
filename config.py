@@ -54,11 +54,7 @@ def get_parser():
     # Whether to save model
     parser.add_argument('--saved_model', type=str2bool, default=False, help="Whether to save the model during training")
     parser.add_argument("--tmp_saved_path", type=str, default="logs/")
-
-    # For PMEEG DBSCAN
-    parser.add_argument("--eps", type=float, default=1)
-    parser.add_argument("--min_samples", type=int, default=5)
-
+    
     # HEDN related
     parser.add_argument("--constraint_loss_weight", type=float, default=0.01, help="Constraint loss weight")
     

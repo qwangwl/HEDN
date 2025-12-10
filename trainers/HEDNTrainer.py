@@ -39,21 +39,19 @@ class HEDNTrainer(object):
         self.stop = 0
         self.best_model_state = None
 
-        # The magic optimizer is used here
-        self.fe_opt = torch.optim.Adam(self.model.proto_classifier.get_parameters(), lr=1e-3)
+        # Aaaaaaaaaaaa!!!!!!Why is a different optimizer being used here!!!!!!!!!!
+        self.fe_opt = torch.optim.Adam(self.model.get_step2_parameters(), lr=1e-3)
 
     def get_model_state(self):
         if hasattr(self.model, "get_state"):
             return self.model.get_state()
         return self.model.state_dict()
     
-
     def get_best_model_state(self):
         return self.best_model_state
 
     def train(self, source_loaders, target_loader):
-        # HEDN不通过Epoch来控制。
-        stop = 0
+
         best_acc = 0.0
         log = []
 
@@ -172,7 +170,7 @@ class HEDNTrainer(object):
         return info
 
 
-class HEDNTrainer_Ablation(HEDNTrainer):
+class AblationHEDNTrainer(HEDNTrainer):
     # The Pytorch implementation of Hard-Easy Dual Network (HEDN) Trainer
     def __init__(self, 
                  model, 
@@ -187,7 +185,7 @@ class HEDNTrainer_Ablation(HEDNTrainer):
                  ablation: str = "main",
                  **kwargs):
 
-        super(HEDNTrainer_Ablation, self).__init__(
+        super(AblationHEDNTrainer, self).__init__(
             model=model,
             optimizer=optimizer,
             lr_scheduler=lr_scheduler,
@@ -234,47 +232,47 @@ class HEDNTrainer_Ablation(HEDNTrainer):
 
             # Phase 1: Domain Adaptation
             if "abl_comp_wo_easy" == self.ablation or "abl_comp_wo_clusterloss" == self.ablation:
-                cls_loss, transfer_loss, cons_loss, src_clu_loss, tgt_clu_loss  = self.model(src_data, tgt_data, src_label, src_cluster, tgt_cluster)
+                cls_loss, transfer_loss, cons_loss, src_clu_loss, tgt_clu_loss, _, _  = self.model(src_data, tgt_data, src_label, src_cluster, tgt_cluster)
                 loss = cls_loss + self.transfer_loss_weight * transfer_loss + self.constraint_loss_weight * cons_loss
                 self.optimizer.zero_grad()
                 loss.backward(retain_graph=True)
                 self.optimizer.step()
 
             elif "abl_comp_wo_hard" == self.ablation:
-                cls_loss, transfer_loss, cons_loss, src_clu_loss, tgt_clu_loss = self.model(src_data, tgt_data, src_label, src_cluster, tgt_cluster)
+                cls_loss, transfer_loss, cons_loss, src_clu_loss, tgt_clu_loss, _, _ = self.model(src_data, tgt_data, src_label, src_cluster, tgt_cluster)
                 self.fe_opt.zero_grad()
                 loss2 = src_clu_loss + tgt_clu_loss
                 loss2.backward()
                 self.fe_opt.step()
             
             elif "abl_comp_two_stage" == self.ablation:
-                cls_loss, transfer_loss, cons_loss, src_clu_loss, tgt_clu_loss = self.model(src_data, tgt_data, src_label, src_cluster, tgt_cluster)
+                cls_loss, transfer_loss, cons_loss, src_clu_loss, tgt_clu_loss, _, _ = self.model(src_data, tgt_data, src_label, src_cluster, tgt_cluster)
                 loss = cls_loss + self.transfer_loss_weight * transfer_loss + self.constraint_loss_weight * cons_loss + src_clu_loss + tgt_clu_loss
                 self.optimizer.zero_grad()
                 loss.backward(retain_graph=True)
                 self.optimizer.step()
             
             elif "abl_comp_wo_clusterloss_target" == self.ablation:
-                cls_loss, transfer_loss, cons_loss, src_clu_loss, tgt_clu_loss  = self.model(src_data, tgt_data, src_label, src_cluster, tgt_cluster)
+                cls_loss, transfer_loss, cons_loss, src_clu_loss, tgt_clu_loss, _, _  = self.model(src_data, tgt_data, src_label, src_cluster, tgt_cluster)
                 loss = cls_loss + self.transfer_loss_weight * transfer_loss + self.constraint_loss_weight * cons_loss
                 self.optimizer.zero_grad()
                 loss.backward(retain_graph=True)
                 self.optimizer.step()
 
-                cls_loss, transfer_loss, cons_loss, src_clu_loss, tgt_clu_loss = self.model(src_data, tgt_data, src_label, src_cluster, tgt_cluster)
+                cls_loss, transfer_loss, cons_loss, src_clu_loss, tgt_clu_loss, _, _ = self.model(src_data, tgt_data, src_label, src_cluster, tgt_cluster)
                 self.fe_opt.zero_grad()
                 loss2 = src_clu_loss
                 loss2.backward()
                 self.fe_opt.step()
 
             elif "abl_comp_wo_clusterloss_source" == self.ablation:
-                cls_loss, transfer_loss, cons_loss, src_clu_loss, tgt_clu_loss  = self.model(src_data, tgt_data, src_label, src_cluster, tgt_cluster)
+                cls_loss, transfer_loss, cons_loss, src_clu_loss, tgt_clu_loss, _, _  = self.model(src_data, tgt_data, src_label, src_cluster, tgt_cluster)
                 loss = cls_loss + self.transfer_loss_weight * transfer_loss + self.constraint_loss_weight * cons_loss
                 self.optimizer.zero_grad()
                 loss.backward(retain_graph=True)
                 self.optimizer.step()
 
-                cls_loss, transfer_loss, cons_loss, src_clu_loss, tgt_clu_loss = self.model(src_data, tgt_data, src_label, src_cluster, tgt_cluster)
+                cls_loss, transfer_loss, cons_loss, src_clu_loss, tgt_clu_loss, _, _ = self.model(src_data, tgt_data, src_label, src_cluster, tgt_cluster)
                 self.fe_opt.zero_grad()
                 loss2 = tgt_clu_loss
                 loss2.backward()

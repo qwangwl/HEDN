@@ -1,1 +1,1 @@
-from models.HEDN import HEDN, EASY, HARD
+from models.HEDN import HEDN, AblationHEDN

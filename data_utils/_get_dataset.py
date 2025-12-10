@@ -3,7 +3,7 @@
 import os
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
-from datasets import SEEDFeatureDataset, SEEDIVFeatureDataset, DEAPDataset, SEEDDataset, SEEDIVDataset
+from datasets import SEEDFeatureDataset, SEEDIVFeatureDataset, DEAPDataset, SEEDRawDataset, SEEDIVRawDataset
 
 def get_dataset(args):
 

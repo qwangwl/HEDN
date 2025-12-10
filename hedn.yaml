@@ -31,10 +31,6 @@ saved_model: False
 # so it's not typically set in the config file unless you want to override it.
 tmp_saved_path: "logs\\" # Example if you want to hardcode for a specific date
 
-# For HEDN DBSCAN
-eps: 1.0
-min_samples: 5
-
 # HEDN related
 # transfer_loss_weight is defined as 1 because \lambda_1 is already implemented in adv
 transfer_loss_weight: 1.0
