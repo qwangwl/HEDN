@@ -12,18 +12,18 @@ src_momentum = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
 tgt_momentum = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
 
 dataset_name = "seed3"
-src_m = 0.5
-for tgt_m in tgt_momentum:
-    for sess in [1, 2, 3]:
-        command = (
-            f"python cross_subject.py "
-            f"--dataset_name {dataset_name} "
-            f"--session {sess} "
-            f"--src_momentum {src_m} "
-            f"--tgt_momentum {tgt_m} "
-            f"--tmp_saved_path logs//params//{src_m}_{tgt_m} "
-        )
-        os.system(command)
+# src_m = 0.5
+# for tgt_m in tgt_momentum:
+#     for sess in [1, 2, 3]:
+#         command = (
+#             f"python cross_subject.py "
+#             f"--dataset_name {dataset_name} "
+#             f"--session {sess} "
+#             f"--src_momentum {src_m} "
+#             f"--tgt_momentum {tgt_m} "
+#             f"--tmp_saved_path logs//params//{src_m}_{tgt_m} "
+#         )
+        # os.system(command)
 
 tgt_m = 0.1
 for src_m in src_momentum:
@@ -42,7 +42,7 @@ dataset_name = "seed3"
 for seed in [40, 41, 42, 43, 44]:
     for sess in [1, 2, 3]:
         command = (
-            f"python main.py "
+            f"python cross_subject.py "
             f"--dataset_name {dataset_name} "
             f"--session {sess} "
             f"--seed {seed} "
@@ -54,7 +54,7 @@ dataset_name = "seed4"
 for seed in [40, 41, 42, 43, 44]:
     for sess in [1, 2, 3]:
         command = (
-            f"python main.py "
+            f"python cross_subject.py "
             f"--dataset_name {dataset_name} "
             f"--session {sess} "
             f"--seed {seed} "
@@ -62,4 +62,4 @@ for seed in [40, 41, 42, 43, 44]:
         )
         os.system(command)
 
-os.system("python cross_dataset.py")
+# os.system("python cross_dataset.py")

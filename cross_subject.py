@@ -34,8 +34,8 @@ def cross_subject(args):
     all_subjects = np.unique(groups[:, 0])
 
     for subject in range(1, args.num_subjects + 1):
-        if  subject >= 2:
-            break
+        # if  subject >= 2:
+        #     break
         print(f"开始适应受试者 {subject}")
         # 每一个受试者都重新定义种子。
         setup_seed(args.seed)
@@ -61,8 +61,9 @@ def cross_subject(args):
             "groups": groups[groups[:,0] == subject]
         }
         train_loader, val_loader = HEDNLoader(args, train_dataset, val_dataset)()
-
-        trainer = get_model_utils_for_ablation(args)
+        trainer  =  get_model_utils(args)
+        # 消融实验使用不同的模型构建函数
+        # trainer = get_model_utils_for_ablation(args)
         
         start_time = time.time()
         best_val_acc, np_log = trainer.train(train_loader, val_loader)

@@ -57,15 +57,15 @@ class HEDNTrainer(object):
 
         self.pre_training_processing(source_loaders)
         
-        # torch.save(self.get_model_state(), "init.pth")
+        # torch.save(self.get_model_state(), "logs/save/init.pth")
 
         source_iter = iter(source_loaders)
         target_iter = iter(target_loader)
 
         for it in range(self.max_iter):
             # if it == 100:
-            #     torch.save(self.get_model_state(), "mid100.pth")
-
+                # torch.save(self.get_model_state(), "logs/save/mid100.pth")
+# 
             self.model.train()
             try:
                 src_data, src_label, src_cluster = next(source_iter)
@@ -149,7 +149,7 @@ class HEDNTrainer(object):
             best_acc = current_acc
             self.best_model_state = copy.deepcopy(self.get_model_state())
             self.stop = 0
-            # torch.save(self.get_model_state(), "best.pth")
+            # torch.save(self.get_model_state(), "logs/save/best.pth")
         return best_acc
     
     def _should_early_stop(self, best_acc: float):
@@ -199,7 +199,7 @@ class AblationHEDNTrainer(HEDNTrainer):
         )
         self.ablation = ablation
         if "abl_comp_wo_hard" == self.ablation:
-            params = list(self.model.feature_extractor.get_parameters()) + list(self.model.get_step2_parameters())
+            params = list(self.model.feature_extractor.get_parameters()) + list(self.model.easy_network.get_parameters())
             self.fe_opt = torch.optim.Adam(params, lr=1e-3)
 
     def train(self, source_loaders, target_loader):
@@ -232,47 +232,47 @@ class AblationHEDNTrainer(HEDNTrainer):
 
             # Phase 1: Domain Adaptation
             if "abl_comp_wo_easy" == self.ablation or "abl_comp_wo_clusterloss" == self.ablation:
-                cls_loss, transfer_loss, cons_loss, src_clu_loss, tgt_clu_loss, _, _  = self.model(src_data, tgt_data, src_label, src_cluster, tgt_cluster)
+                cls_loss, transfer_loss, cons_loss, src_clu_loss, tgt_clu_loss, easy_idx, hard_idx  = self.model(src_data, tgt_data, src_label, src_cluster, tgt_cluster)
                 loss = cls_loss + self.transfer_loss_weight * transfer_loss + self.constraint_loss_weight * cons_loss
                 self.optimizer.zero_grad()
                 loss.backward(retain_graph=True)
                 self.optimizer.step()
 
             elif "abl_comp_wo_hard" == self.ablation:
-                cls_loss, transfer_loss, cons_loss, src_clu_loss, tgt_clu_loss, _, _ = self.model(src_data, tgt_data, src_label, src_cluster, tgt_cluster)
+                cls_loss, transfer_loss, cons_loss, src_clu_loss, tgt_clu_loss, easy_idx, hard_idx = self.model(src_data, tgt_data, src_label, src_cluster, tgt_cluster)
                 self.fe_opt.zero_grad()
                 loss2 = src_clu_loss + tgt_clu_loss
                 loss2.backward()
                 self.fe_opt.step()
             
             elif "abl_comp_two_stage" == self.ablation:
-                cls_loss, transfer_loss, cons_loss, src_clu_loss, tgt_clu_loss, _, _ = self.model(src_data, tgt_data, src_label, src_cluster, tgt_cluster)
+                cls_loss, transfer_loss, cons_loss, src_clu_loss, tgt_clu_loss, easy_idx, hard_idx = self.model(src_data, tgt_data, src_label, src_cluster, tgt_cluster)
                 loss = cls_loss + self.transfer_loss_weight * transfer_loss + self.constraint_loss_weight * cons_loss + src_clu_loss + tgt_clu_loss
                 self.optimizer.zero_grad()
                 loss.backward(retain_graph=True)
                 self.optimizer.step()
             
             elif "abl_comp_wo_clusterloss_target" == self.ablation:
-                cls_loss, transfer_loss, cons_loss, src_clu_loss, tgt_clu_loss, _, _  = self.model(src_data, tgt_data, src_label, src_cluster, tgt_cluster)
+                cls_loss, transfer_loss, cons_loss, src_clu_loss, tgt_clu_loss, easy_idx, hard_idx  = self.model(src_data, tgt_data, src_label, src_cluster, tgt_cluster)
                 loss = cls_loss + self.transfer_loss_weight * transfer_loss + self.constraint_loss_weight * cons_loss
                 self.optimizer.zero_grad()
                 loss.backward(retain_graph=True)
                 self.optimizer.step()
 
-                cls_loss, transfer_loss, cons_loss, src_clu_loss, tgt_clu_loss, _, _ = self.model(src_data, tgt_data, src_label, src_cluster, tgt_cluster)
+                cls_loss, transfer_loss, cons_loss, src_clu_loss, tgt_clu_loss, easy_idx, hard_idx = self.model(src_data, tgt_data, src_label, src_cluster, tgt_cluster)
                 self.fe_opt.zero_grad()
                 loss2 = src_clu_loss
                 loss2.backward()
                 self.fe_opt.step()
 
             elif "abl_comp_wo_clusterloss_source" == self.ablation:
-                cls_loss, transfer_loss, cons_loss, src_clu_loss, tgt_clu_loss, _, _  = self.model(src_data, tgt_data, src_label, src_cluster, tgt_cluster)
+                cls_loss, transfer_loss, cons_loss, src_clu_loss, tgt_clu_loss, easy_idx, hard_idx  = self.model(src_data, tgt_data, src_label, src_cluster, tgt_cluster)
                 loss = cls_loss + self.transfer_loss_weight * transfer_loss + self.constraint_loss_weight * cons_loss
                 self.optimizer.zero_grad()
                 loss.backward(retain_graph=True)
                 self.optimizer.step()
 
-                cls_loss, transfer_loss, cons_loss, src_clu_loss, tgt_clu_loss, _, _ = self.model(src_data, tgt_data, src_label, src_cluster, tgt_cluster)
+                cls_loss, transfer_loss, cons_loss, src_clu_loss, tgt_clu_loss, easy_idx, hard_idx = self.model(src_data, tgt_data, src_label, src_cluster, tgt_cluster)
                 self.fe_opt.zero_grad()
                 loss2 = tgt_clu_loss
                 loss2.backward()
@@ -305,7 +305,7 @@ class AblationHEDNTrainer(HEDNTrainer):
                 "tgt_clu_loss": tgt_clu_loss.detach().item() if isinstance(tgt_clu_loss, torch.Tensor) else tgt_clu_loss,
             }
 
-            log_entry = [v for _, v in iter_losses.items()] + [source_acc, target_acc, best_acc]
+            log_entry = [v for _, v in iter_losses.items()] + [source_acc, target_acc, best_acc, int(easy_idx.cpu().numpy()) + 1, int(hard_idx.cpu().numpy()) + 1]
             log.append(log_entry)
 
             info = self._log_training_info(it, iter_losses, source_acc, target_acc, best_acc)
