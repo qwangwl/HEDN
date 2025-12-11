@@ -257,17 +257,3 @@ Use the provided script to reproduce all results:
 ```bash
 python run.py
 ```
-
----
-python cross_dataset.py
-```
-
-#### Run All Experiments
-
-Use the provided script to reproduce all results:
-
-```bash
-python run.py
-```
-
----
