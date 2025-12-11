@@ -39,15 +39,14 @@ def cross_subject(args):
         print(f"开始适应受试者 {subject}")
         # 每一个受试者都重新定义种子。
         setup_seed(args.seed)
-        if args.ablation == "num_sources":
-            source_subjects = all_subjects[all_subjects != subject]
-            selected_subjects = source_subjects[:args.num_sources]
-            # print(selected_subjects)
-            train_mask = np.isin(groups[:, 0], selected_subjects)
-        else:
-            train_mask = groups[:, 0] != subject
-        # print(len(train_mask))
-        # print(all_subjects)
+        # if args.ablation == "num_sources":
+        #     source_subjects = all_subjects[all_subjects != subject]
+        #     selected_subjects = source_subjects[:args.num_sources]
+        #     # print(selected_subjects)
+        #     train_mask = np.isin(groups[:, 0], selected_subjects)
+        # else:
+        train_mask = groups[:, 0] != subject
+ 
         print(f"训练样本数: {np.sum(train_mask)}, 测试样本数: {np.sum(groups[:,0]==subject)}")
         train_dataset = {
             "data": data[train_mask],
