@@ -1,9 +1,10 @@
 # HEDN  
-[English](./README.md) | [简体中文](./README_zh.md)
+[English](.readme.md) | [简体中文](./readme_zh.md)
 
 ## Overview
 
-We propose **Hard-Easy Dual Network (HEDN)**, a novel framework for cross-subject EEG-based emotion recognition. 
+This repository is the official PyTorch implementation of the paper "HEDN: A Hard-Easy Dual Network with Source Reliability Assessment for Cross-Subject EEG Emotion Recognition".
+(arxiv: https://arxiv.org/abs/2511.06782)
 
 ![Overall Architecture](./overall.png)
 
@@ -130,3 +131,20 @@ Use the provided script to reproduce all results:
 ```bash
 python run.py
 ```
+---
+## How to Cite
+If you use the code or methods from this repository in your research, please cite our paper:
+
+```bibtex
+@misc{wang2025hedn,
+title={HEDN: A Hard-Easy Dual Network with Source Reliability Assessment for Cross-Subject EEG Emotion Recognition}, 
+author={Qiang Wang and Liying Yang and Jiayun Song and Yifan Bai and Jingtao Du},
+year={2025},
+eprint={2511.06782},
+archivePrefix={arXiv},
+url={https://arxiv.org/abs/2511.06782}, 
+}
+```
+---
+## Contact
+If you have any questions, feel free to open an issue on GitHub or contact us directly.
