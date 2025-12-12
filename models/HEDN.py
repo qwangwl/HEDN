@@ -362,3 +362,73 @@ class HEDN(nn.Module):
         self.easy_network.src_cluster_labels = state["proto"]["src_cluster_labels"]
         self.easy_network.src_cluster_centers = state["proto"]["src_cluster_centers"]
         self.easy_network.tgt_cluster_centers = state["proto"]["tgt_cluster_centers"]
+
+
+class AblationHEDN(HEDN):
+    def __init__(self, 
+                 ablation: str = "main",
+                 **hedn_kwargs):
+        super(AblationHEDN, self).__init__(**hedn_kwargs)
+
+        self.ablation = ablation
+        self.use_hard = True
+        self.use_easy = True
+        self.use_sim = True
+
+        if self.ablation == "abl_comp_wo_easy":
+            # 只训练 hard 分支（HARD 模式）
+            self.use_easy = False
+            self.use_sim = False
+        elif self.ablation == "abl_comp_wo_hard":
+            # 只训练 easy 分支（EASY 模式）
+            self.use_hard = False
+            self.use_sim = False
+
+    def forward(self, srcs, tgt, src_labels, src_clusters, tgt_cluster):
+        srcs = srcs.permute(1, 0, 2) 
+        src_labels = src_labels.permute(1, 0, 2)
+        src_clusters = src_clusters.permute(1, 0)
+
+        if self.ablation == "abl_sra_random":
+            hard_idx, easy_idx = self.source_assessment_by_random()
+        elif "abl_sra_w_hard" == self.ablation:
+            hard_idx, easy_idx = self.source_assessment(srcs, src_labels, tgt)
+            easy_idx = hard_idx  
+        elif "abl_sra_w_easy" == self.ablation:
+            hard_idx, easy_idx = self.source_assessment(srcs, src_labels, tgt)
+            hard_idx = easy_idx
+        else:
+            hard_idx, easy_idx = self.source_assessment(srcs, src_labels, tgt)
+
+        tgt_feat = self.feature_extractor(tgt)
+        easy_feat, easy_cluster = self.feature_extractor(srcs[easy_idx]), src_clusters[easy_idx]
+        hard_feat, hard_label = self.feature_extractor(srcs[hard_idx]), src_labels[hard_idx]
+
+        loss_cls, loss_adv, src_clu_loss, tgt_clu_loss, loss_consis = 0, 0, 0, 0, 0
+
+        if self.use_hard:
+            loss_cls, loss_adv = self.hard_forward(hard_feat, tgt_feat, hard_label)
+        if self.use_easy:
+            src_clu_loss, tgt_clu_loss = self.easy_forward(easy_feat, tgt_feat, easy_cluster, tgt_cluster)
+            # update memory bank
+            tgt_proto_pred = self.easy_network(
+                    easy_feat.detach(),
+                    easy_cluster, 
+                    easy_idx, 
+                    tgt_feat.detach(),
+                    tgt_cluster
+                )
+            if self.use_sim:
+                tgt_logit = self.hard_classifier(tgt_feat)
+                loss_consis = self.consis_loss(tgt_logit, tgt_proto_pred.to(tgt_logit.device))
+        
+        return loss_cls, loss_adv, loss_consis, src_clu_loss, tgt_clu_loss, easy_idx, hard_idx
+    
+    def predict(self, data, mode="target"):
+        if mode == "source":
+            return self.predict_by_hard(data)
+        elif mode == "target":
+            if self.ablation == "abl_comp_wo_easy":
+                return self.predict_by_hard(data)
+            return self.predict_by_easy(data)
+        

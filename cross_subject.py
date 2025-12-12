@@ -39,14 +39,15 @@ def cross_subject(args):
         print(f"开始适应受试者 {subject}")
         # 每一个受试者都重新定义种子。
         setup_seed(args.seed)
-        # if args.ablation == "num_sources":
-        #     source_subjects = all_subjects[all_subjects != subject]
-        #     selected_subjects = source_subjects[:args.num_sources]
-        #     # print(selected_subjects)
-        #     train_mask = np.isin(groups[:, 0], selected_subjects)
-        # else:
-        train_mask = groups[:, 0] != subject
- 
+        if args.ablation == "num_sources":
+            source_subjects = all_subjects[all_subjects != subject]
+            selected_subjects = source_subjects[:args.num_sources]
+            # print(selected_subjects)
+            train_mask = np.isin(groups[:, 0], selected_subjects)
+        else:
+            train_mask = groups[:, 0] != subject
+        # print(len(train_mask))
+        # print(all_subjects)
         print(f"训练样本数: {np.sum(train_mask)}, 测试样本数: {np.sum(groups[:,0]==subject)}")
         train_dataset = {
             "data": data[train_mask],
@@ -60,9 +61,9 @@ def cross_subject(args):
             "groups": groups[groups[:,0] == subject]
         }
         train_loader, val_loader = HEDNLoader(args, train_dataset, val_dataset)()
-        trainer  =  get_model_utils(args)
+        # trainer  =  get_model_utils(args)
         # 消融实验使用不同的模型构建函数
-        # trainer = get_model_utils_for_ablation(args)
+        trainer = get_model_utils_for_ablation(args)
         
         start_time = time.time()
         best_val_acc, np_log = trainer.train(train_loader, val_loader)
