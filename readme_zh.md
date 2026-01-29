@@ -5,7 +5,6 @@
 ## 概述
 
 本仓库是"HEDN: A Hard-Easy Dual Network with Source Reliability Assessment for Cross-Subject EEG Emotion Recognition"的Pytorch实现。
-(arxiv: https://arxiv.org/abs/2511.06782)
 
 ![整体架构图](./overall.png)
 
@@ -134,23 +133,4 @@ python cross_dataset.py
 ```bash
 python run.py
 ```
-
----
-## 如何引用
-如果我们的方法与代码对您的研究有所帮助，请引用:
-
-```bibtex
-@misc{wang2025hedn,
-title={HEDN: A Hard-Easy Dual Network with Source Reliability Assessment for Cross-Subject EEG Emotion Recognition}, 
-author={Qiang Wang and Liying Yang and Jiayun Song and Yifan Bai and Jingtao Du},
-year={2025},
-eprint={2511.06782},
-archivePrefix={arXiv},
-url={https://arxiv.org/abs/2511.06782}, 
-}
-```
-
-## 联系
-
-如果你有任何问题，欢迎在GitHub上开启issue或直接联系我们。
 
