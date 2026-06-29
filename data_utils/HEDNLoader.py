@@ -81,30 +81,88 @@ class HEDNLoader(object):
         self.train_dataset = train_dataset
         self.val_dataset = val_dataset
         # self.best_cluster_params = {"eps": args.eps, "min_samples": args.min_samples}
-        self._find_best_cluster_params(self.val_dataset)
+        self._find_best_cluster_params(self.train_dataset)
 
     def __call__(self):
         train_loader = self.create_train_loader()
         val_loader = self.create_val_loader()
         return train_loader, val_loader
     
+    
+    def _cluster_purity(self, y_true, cluster_labels):
+        """
+        Compute cluster purity.
+
+        Args:
+            y_true: ground-truth labels, shape [N] or [N, C]
+            cluster_labels: predicted cluster labels, shape [N]
+
+        Returns:
+            purity: float
+        """
+        y_true = np.asarray(y_true)
+        cluster_labels = np.asarray(cluster_labels)
+
+        # 如果 y 是 one-hot，先转成类别编号
+        if y_true.ndim > 1:
+            y_true = np.argmax(y_true, axis=1)
+
+        # 去掉 DBSCAN 的噪声点
+        mask = cluster_labels != -1
+        y_true = y_true[mask]
+        cluster_labels = cluster_labels[mask]
+        total_correct = 0
+        for cluster_id in np.unique(cluster_labels):
+            idx = cluster_labels == cluster_id
+            cluster_true_labels = y_true[idx]
+            if len(cluster_true_labels) == 0:
+                continue
+            _, counts = np.unique(cluster_true_labels, return_counts=True)
+            total_correct += counts.max()
+        purity = total_correct / len(y_true)
+        return purity
+
     def _find_best_cluster_params(self, datasets):
+        """
+        使用第一个源域作为参数选择域，
+        以 cluster purity 作为评价指标选择 DBSCAN 的 eps 和 min_samples。
+        """
+        data = datasets["data"]
+        labels = datasets["labels"]
+        subjects = datasets["groups"][:, 0]
 
-        X = datasets["data"]
-        trial_ids = datasets["groups"][:, 1]
+        # 选择第一个源域
+        first_subject = np.unique(subjects)[0]
+        mask = subjects == first_subject
 
-        best_nmi = -1
+        X = data[mask]
+        y = labels[mask]
+
+        best_purity = -1
+
         eps_values = np.arange(1, 5.1, 0.5)
         min_samples_values = range(3, 7, 1)
+
         for eps in eps_values:
             for min_samples in min_samples_values:
-                clustering = DBSCAN(eps=eps, min_samples=min_samples).fit(X)
-                labels = clustering.labels_
-                nmi = normalized_mutual_info_score(trial_ids, labels)
-                if nmi > best_nmi:
-                    best_nmi = nmi
-                    self.best_cluster_params = {"eps": eps, "min_samples": min_samples}
+                clustering = DBSCAN(
+                    eps=eps,
+                    min_samples=min_samples,
+                ).fit(X)
+                cluster_labels = clustering.labels_
 
+                purity = self._cluster_purity(
+                    y_true=y,
+                    cluster_labels=cluster_labels,
+                )
+
+                if purity > best_purity:
+                    best_purity = purity
+                    self.best_cluster_params = {
+                        "eps": eps,
+                        "min_samples": min_samples,
+                    }
+        
     def _perform_clustering(self, X, y):
         clustering = DBSCAN(**self.best_cluster_params).fit(X)
         labels = clustering.labels_

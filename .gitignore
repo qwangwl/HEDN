@@ -8,3 +8,5 @@ img/
 logs*/
 *.pdf
 .history/
+fig/
+zlogs/
